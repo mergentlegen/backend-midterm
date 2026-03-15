@@ -1,0 +1,56 @@
+const projectService = require("../services/projectService");
+
+async function createProject(req, res, next) {
+  try {
+    const project = await projectService.createProject(req.body);
+    res.status(201).json({
+      message: "Project created successfully.",
+      data: project,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getAllProjects(req, res, next) {
+  try {
+    const projects = await projectService.getAllProjects();
+    res.status(200).json({
+      message: "Projects fetched successfully.",
+      data: projects,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getProjectById(req, res, next) {
+  try {
+    const project = await projectService.getProjectById(Number(req.params.id));
+    res.status(200).json({
+      message: "Project fetched successfully.",
+      data: project,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function addRewardTier(req, res, next) {
+  try {
+    const rewardTier = await projectService.addRewardTier(Number(req.params.id), req.body);
+    res.status(201).json({
+      message: "Reward tier added successfully.",
+      data: rewardTier,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  createProject,
+  getAllProjects,
+  getProjectById,
+  addRewardTier,
+};

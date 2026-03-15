@@ -1,0 +1,23 @@
+{
+  "name": "backend-midterm",
+  "version": "1.0.0",
+  "description": "Crowdfunding backend midterm - Part 1: projects and reward tiers",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "postgresql",
+    "crowdfunding"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}
