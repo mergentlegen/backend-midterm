@@ -21,7 +21,7 @@ function handleError(res, error) {
 async function createPledge(req, res) {
   try {
     const projectId = Number(req.params.id);
-    const { backer_id: backerId, tier_id: tierId, amount } = req.body;
+    const { backer_id: backerId, tier_id: tierId = null, amount } = req.body;
 
     const pledge = await createPledgeService(projectId, backerId, tierId, amount);
 
@@ -39,7 +39,10 @@ async function finalizeProject(req, res) {
     const projectId = Number(req.params.id);
     const result = await finalizeProjectService(projectId);
 
-    return res.status(200).json(result);
+    return res.status(200).json({
+      message: 'Project finalized successfully',
+      data: result,
+    });
   } catch (error) {
     return handleError(res, error);
   }

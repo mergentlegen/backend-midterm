@@ -8,12 +8,12 @@ class PledgeServiceError extends Error {
   }
 }
 
-function isPositiveNumber(value) {
-  return Number.isFinite(Number(value)) && Number(value) > 0;
-}
-
 function isPositiveInteger(value) {
   return Number.isInteger(Number(value)) && Number(value) > 0;
+}
+
+function isPositiveNumber(value) {
+  return Number.isFinite(Number(value)) && Number(value) > 0;
 }
 
 async function createPledge(projectId, backerId, tierId, amount) {
@@ -36,11 +36,11 @@ async function createPledge(projectId, backerId, tierId, amount) {
   const client = await pool.connect();
 
   try {
-    // Keep project/tier validation, pledge creation, and inventory updates atomic.
+    // One transaction keeps validation, inventory changes, and pledge creation atomic.
     await client.query('BEGIN');
 
     const projectResult = await client.query(
-      `SELECT id, goal, deadline, status
+      `SELECT id, status, deadline
        FROM projects
        WHERE id = $1
        FOR UPDATE`,
@@ -72,7 +72,7 @@ async function createPledge(projectId, backerId, tierId, amount) {
       throw new PledgeServiceError('Backer not found', 404);
     }
 
-    let tier = null;
+    let selectedTier = null;
 
     if (tierId !== undefined && tierId !== null) {
       const tierResult = await client.query(
@@ -87,13 +87,13 @@ async function createPledge(projectId, backerId, tierId, amount) {
         throw new PledgeServiceError('Reward tier not found', 404);
       }
 
-      tier = tierResult.rows[0];
+      selectedTier = tierResult.rows[0];
 
-      if (Number(tier.quantity_remaining) <= 0) {
+      if (Number(selectedTier.quantity_remaining) <= 0) {
         throw new PledgeServiceError('Reward tier is sold out', 409);
       }
 
-      if (Number(amount) < Number(tier.amount)) {
+      if (Number(amount) < Number(selectedTier.amount)) {
         throw new PledgeServiceError(
           'Amount must be greater than or equal to the reward tier amount',
           400
@@ -108,12 +108,12 @@ async function createPledge(projectId, backerId, tierId, amount) {
       [projectId, backerId, tierId ?? null, amount]
     );
 
-    if (tier) {
+    if (selectedTier) {
       await client.query(
         `UPDATE reward_tiers
          SET quantity_remaining = quantity_remaining - 1
          WHERE id = $1`,
-        [tier.id]
+        [selectedTier.id]
       );
     }
 
@@ -135,7 +135,7 @@ async function finalizeProject(projectId) {
   const client = await pool.connect();
 
   try {
-    // Lock the project first so finalization and new pledges cannot race each other.
+    // Locking the project row serializes finalization against concurrent pledges.
     await client.query('BEGIN');
 
     const projectResult = await client.query(
@@ -164,89 +164,60 @@ async function finalizeProject(projectId) {
     );
 
     const totalPledged = Number(totalResult.rows[0].total);
-    const goal = Number(project.goal);
-
-    if (totalPledged >= goal) {
-      const projectUpdateResult = await client.query(
-        `UPDATE projects
-         SET status = 'successful'
-         WHERE id = $1
-         RETURNING id, creator_id, title, description, goal, deadline, status, created_at`,
-        [projectId]
-      );
-
-      await client.query('COMMIT');
-
-      return {
-        message: 'Project finalized successfully',
-        data: {
-          project: projectUpdateResult.rows[0],
-          total_pledged: totalPledged,
-          goal,
-        },
-      };
-    }
+    const nextStatus = totalPledged >= Number(project.goal) ? 'successful' : 'failed';
 
     const projectUpdateResult = await client.query(
       `UPDATE projects
-       SET status = 'failed'
+       SET status = $2
        WHERE id = $1
        RETURNING id, creator_id, title, description, goal, deadline, status, created_at`,
-      [projectId]
-    );
-
-    const pledgesResult = await client.query(
-      `SELECT id, tier_id, amount
-       FROM pledges
-       WHERE project_id = $1 AND status = 'confirmed'
-       FOR UPDATE`,
-      [projectId]
+      [projectId, nextStatus]
     );
 
     let refundsCreated = 0;
-    const tierRefundCounts = new Map();
 
-    for (const pledge of pledgesResult.rows) {
-      await client.query(
-        `INSERT INTO refunds (pledge_id, amount, status)
-         VALUES ($1, $2, 'pending')`,
-        [pledge.id, pledge.amount]
+    if (nextStatus === 'failed') {
+      const pledgesResult = await client.query(
+        `SELECT id, tier_id, amount
+         FROM pledges
+         WHERE project_id = $1 AND status = 'confirmed'
+         FOR UPDATE`,
+        [projectId]
       );
 
-      refundsCreated += 1;
+      for (const pledge of pledgesResult.rows) {
+        await client.query(
+          `INSERT INTO refunds (pledge_id, amount, status)
+           VALUES ($1, $2, 'pending')`,
+          [pledge.id, pledge.amount]
+        );
 
-      if (pledge.tier_id) {
-        const currentCount = tierRefundCounts.get(pledge.tier_id) || 0;
-        tierRefundCounts.set(pledge.tier_id, currentCount + 1);
+        refundsCreated += 1;
+
+        if (pledge.tier_id) {
+          await client.query(
+            `UPDATE reward_tiers
+             SET quantity_remaining = quantity_remaining + 1
+             WHERE id = $1`,
+            [pledge.tier_id]
+          );
+        }
       }
-    }
 
-    await client.query(
-      `UPDATE pledges
-       SET status = 'refunded'
-       WHERE project_id = $1 AND status = 'confirmed'`,
-      [projectId]
-    );
-
-    for (const [tierId, refundCount] of tierRefundCounts.entries()) {
       await client.query(
-        `UPDATE reward_tiers
-         SET quantity_remaining = quantity_remaining + $2
-         WHERE id = $1`,
-        [tierId, refundCount]
+        `UPDATE pledges
+         SET status = 'refunded'
+         WHERE project_id = $1 AND status = 'confirmed'`,
+        [projectId]
       );
     }
 
     await client.query('COMMIT');
 
     return {
-      message: 'Project finalized and refunds created',
-      data: {
-        project: projectUpdateResult.rows[0],
-        total_pledged: totalPledged,
-        goal,
-        refunds_created: refundsCreated,
-      },
+      project: projectUpdateResult.rows[0],
+      total_pledged: totalPledged,
+      refunds_created: refundsCreated,
     };
   } catch (error) {
     await client.query('ROLLBACK');
