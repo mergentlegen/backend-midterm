@@ -14,7 +14,7 @@ async function createProject(req, res, next) {
 
 async function getAllProjects(req, res, next) {
   try {
-    const projects = await projectService.getAllProjects();
+    const projects = await projectService.getAllProjects(req.query);
     res.status(200).json({
       message: "Projects fetched successfully.",
       data: projects,

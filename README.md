@@ -1,12 +1,29 @@
 # backend-midterm
 
-Crowdfunding backend midterm project built with Node.js, Express, and PostgreSQL.
+Crowdfunding backend midterm project built with Node.js, Express, and PostgreSQL on Neon.
 
-This scaffold covers Part 1 only:
-- projects
-- reward tiers
+This project is a small Kickstarter-like API where:
+- creators can create projects
+- projects can have reward tiers with limited quantities
+- backers can create pledges
+- projects can be finalized as successful or failed
 
-It does not include pledges or refunds.
+## What is implemented
+
+### Part 1
+- `users` table
+- `projects` table
+- `reward_tiers` table
+- `POST /projects`
+- `GET /projects`
+- `GET /projects/:id`
+- `POST /projects/:id/tiers`
+
+### Part 2
+- `pledges` table
+- `refunds` table
+- `POST /projects/:id/pledges`
+- `POST /projects/:id/finalize`
 
 ## Project structure
 
@@ -15,19 +32,28 @@ src/
   app.js
   server.js
   controllers/
+    pledgeController.js
     projectController.js
   db/
     pool.js
     schema.sql
+    migrations/
+      001_create_users_projects_reward_tiers.sql
+      002_create_pledges_refunds.sql
   middlewares/
     errorHandler.js
     validators.js
   routes/
+    pledgeRoutes.js
     projectRoutes.js
   services/
+    pledgeService.js
     projectService.js
   utils/
     AppError.js
+postman/
+  Crowdfunding-Part1.postman_collection.json
+  Crowdfunding-Backend-API.postman_collection.json
 ```
 
 ## Setup
@@ -38,13 +64,17 @@ src/
 npm install
 ```
 
-2. Create a `.env` file from `.env.example`.
+2. Create `.env` in the root of the project:
 
-3. Create the PostgreSQL database and run:
-
-```sql
-\i src/db/schema.sql
+```env
+PORT=5000
+DATABASE_URL=your_neon_connection_string
+DB_SSL=true
 ```
+
+3. Apply database schema and migrations in Neon SQL Editor:
+- first run `src/db/schema.sql` if the database is empty
+- then run `src/db/migrations/002_create_pledges_refunds.sql` for Part 2
 
 4. Start the server:
 
@@ -52,50 +82,95 @@ npm install
 npm run dev
 ```
 
-## Endpoints
+Server base URL:
 
-### Create project
+```text
+http://localhost:5000
+```
 
-`POST /projects`
+## Main endpoints
+
+### Projects
+- `POST /projects`
+- `GET /projects`
+- `GET /projects/:id`
 
 Example body:
 
 ```json
 {
-  "title": "Smart Water Bottle",
-  "description": "A bottle that tracks hydration and syncs with mobile apps.",
-  "goal": 5000,
-  "deadline": "2026-06-30T12:00:00.000Z",
+  "title": "Indie Game",
+  "description": "A small indie game",
+  "goal": 1000,
+  "deadline": "2026-12-01T00:00:00",
   "status": "active",
   "creator_id": 1
 }
 ```
 
-### Get all projects
-
-`GET /projects`
-
-### Get project by id
-
-`GET /projects/:id`
-
-### Add reward tier to project
-
-`POST /projects/:id/tiers`
+### Reward tiers
+- `POST /projects/:id/tiers`
 
 Example body:
 
 ```json
 {
-  "title": "Early Bird Supporter",
-  "amount": 25,
-  "quantity_total": 100,
-  "quantity_remaining": 100
+  "title": "Sticker Pack",
+  "amount": 10,
+  "quantity_total": 50
 }
 ```
 
+### Pledges
+- `POST /projects/:id/pledges`
+
+Example with tier:
+
+```json
+{
+  "backer_id": 2,
+  "tier_id": 1,
+  "amount": 10
+}
+```
+
+Example without tier:
+
+```json
+{
+  "backer_id": 2,
+  "amount": 5
+}
+```
+
+### Finalize
+- `POST /projects/:id/finalize`
+
+This endpoint does not need a request body.
+
+## Business rules
+
+- A project must exist before reward tiers or pledges can be added.
+- A pledge cannot be created after the deadline.
+- If a tier is selected, it must belong to the same project.
+- Tier quantity is decremented atomically inside a transaction.
+- When a failed project is finalized, refund records are created and tier inventory is restored.
+- A project cannot be finalized twice.
+
+## Testing
+
+Postman collections are included in the `postman/` folder:
+- `Crowdfunding-Backend-API.postman_collection.json`
+
+Recommended order for checking the full flow:
+1. Create project
+2. Add reward tier
+3. Create pledge with tier
+4. Create pledge without tier
+5. Finalize project
+
 ## Notes
 
-- `users` is included as a supporting table because `projects.creator_id` references it.
-- Assumed user fields: `id`, `full_name`, `email`, `password_hash`, `created_at`.
-- Allowed project status values: `draft`, `active`, `closed`, `cancelled`.
+- `users` is used as a supporting table for creators and backers.
+- Database connection uses `pg` and Neon-compatible SSL config.
+- Error handling is centralized through `AppError` and the error middleware.

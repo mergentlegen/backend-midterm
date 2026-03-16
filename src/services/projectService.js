@@ -31,7 +31,21 @@ const values = [
   return result.rows[0];
 }
 
-async function getAllProjects() {
+async function getAllProjects(filters = {}) {
+  const conditions = [];
+  const values = [];
+
+  if (filters.finalized === "true") {
+    conditions.push(`p.status IN ('successful', 'failed')`);
+  }
+
+  if (filters.status) {
+    values.push(filters.status);
+    conditions.push(`p.status = $${values.length}`);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
   const query = `
     SELECT
       p.id,
@@ -45,11 +59,12 @@ async function getAllProjects() {
       COALESCE(COUNT(rt.id), 0)::INTEGER AS reward_tiers_count
     FROM projects p
     LEFT JOIN reward_tiers rt ON rt.project_id = p.id
+    ${whereClause}
     GROUP BY p.id
     ORDER BY p.created_at DESC
   `;
 
-  const result = await pool.query(query);
+  const result = await pool.query(query, values);
   return result.rows;
 }
 
