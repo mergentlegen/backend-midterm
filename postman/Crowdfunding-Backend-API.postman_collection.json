@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "9a90dc71-b2d0-4c43-8eaf-4d6402f5c410",
-    "name": "Crowdfunding Backend - Part 1",
-    "description": "Postman collection for Projects and Reward Tiers endpoints.",
+    "_postman_id": "a2b36c7f-7d7f-4d09-bf4f-3f17cf284a9b",
+    "name": "Crowdfunding Backend API",
+    "description": "Postman collection for Projects, Reward Tiers, Pledges, and Finalize endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,6 +13,14 @@
     {
       "key": "projectId",
       "value": "1"
+    },
+    {
+      "key": "tierId",
+      "value": "1"
+    },
+    {
+      "key": "backerId",
+      "value": "3"
     }
   ],
   "item": [
@@ -103,6 +111,91 @@
                 "projects",
                 "{{projectId}}",
                 "tiers"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pledges",
+      "item": [
+        {
+          "name": "Create Pledge With Tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"backer_id\": {{backerId}},\n  \"tier_id\": {{tierId}},\n  \"amount\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/pledges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "pledges"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Pledge Without Tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"backer_id\": {{backerId}},\n  \"amount\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/pledges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "pledges"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Finalize",
+      "item": [
+        {
+          "name": "Finalize Project",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/finalize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "finalize"
               ]
             }
           },

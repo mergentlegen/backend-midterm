@@ -1,6 +1,7 @@
 const AppError = require("../utils/AppError");
 
-const allowedStatuses = ["draft", "active", "closed", "cancelled"];
+const allowedStatuses = ["draft", "active", "closed", "cancelled", "successful", "failed"];
+const allowedProjectCreationStatuses = ["draft", "active", "closed", "cancelled"];
 
 function validateNumericIdParam(paramName) {
   return (req, res, next) => {
@@ -21,8 +22,8 @@ function validateProjectPayload(req, res, next) {
     return next(new AppError("Title is required.", 400));
   }
 
-  if (description !== undefined && (typeof description !== "string" || !description.trim())) {
-    return next(new AppError("Description must be a non-empty string when provided.", 400));
+  if (!description || typeof description !== "string" || !description.trim()) {
+    return next(new AppError("Description is required.", 400));
   }
 
   if (typeof goal !== "number" || Number.isNaN(goal) || goal <= 0) {
@@ -37,7 +38,7 @@ function validateProjectPayload(req, res, next) {
     return next(new AppError("Deadline must be in the future.", 400));
   }
 
-  if (status && !allowedStatuses.includes(status)) {
+  if (status && !allowedProjectCreationStatuses.includes(status)) {
     return next(new AppError("Status is invalid.", 400));
   }
 
@@ -66,8 +67,27 @@ function validateRewardTierPayload(req, res, next) {
   next();
 }
 
+function validatePledgePayload(req, res, next) {
+  const { backer_id, tier_id, amount } = req.body;
+
+  if (!Number.isInteger(backer_id) || backer_id <= 0) {
+    return next(new AppError("backer_id must be a positive integer.", 400));
+  }
+
+  if (tier_id !== undefined && tier_id !== null && (!Number.isInteger(tier_id) || tier_id <= 0)) {
+    return next(new AppError("tier_id must be a positive integer when provided.", 400));
+  }
+
+  if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
+    return next(new AppError("Amount must be a number greater than 0.", 400));
+  }
+
+  next();
+}
+
 module.exports = {
   validateProjectPayload,
   validateRewardTierPayload,
+  validatePledgePayload,
   validateNumericIdParam,
 };
