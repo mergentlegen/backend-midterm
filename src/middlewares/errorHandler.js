@@ -13,6 +13,20 @@ function errorHandler(err, req, res, next) {
     constraint: err.constraint,
   });
 
+  if (err.code === "P2002") {
+    return res.status(409).json({
+      message: "Unique constraint failed.",
+      error: err.message,
+    });
+  }
+
+  if (err.code === "P2025") {
+    return res.status(404).json({
+      message: "Requested record was not found.",
+      error: err.message,
+    });
+  }
+
   if (err.code === "23505") {
     return res.status(409).json({
       message: "Duplicate value violates a unique constraint.",

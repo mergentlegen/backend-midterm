@@ -2,7 +2,7 @@ const pledgeService = require("../services/pledgeService");
 
 async function createPledge(req, res, next) {
   try {
-    const pledge = await pledgeService.createPledge(Number(req.params.id), req.body);
+    const pledge = await pledgeService.createPledge(Number(req.params.id), req.body, req.user.id);
     res.status(201).json({
       message: "Pledge created successfully.",
       data: pledge,
@@ -14,7 +14,7 @@ async function createPledge(req, res, next) {
 
 async function finalizeProject(req, res, next) {
   try {
-    const result = await pledgeService.finalizeProject(Number(req.params.id));
+    const result = await pledgeService.finalizeProject(Number(req.params.id), req.user.id);
     res.status(200).json({
       message: "Project finalized successfully.",
       data: result,

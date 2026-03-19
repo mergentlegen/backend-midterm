@@ -8,9 +8,46 @@ Base URL:
 http://localhost:5000
 ```
 
-## 1. Create project
+## 1. Register user
+
+**POST** `/auth/register`
+
+Request body:
+
+```json
+{
+  "full_name": "Test User",
+  "email": "test@example.com",
+  "password": "123456"
+}
+```
+
+Success response:
+- `201 Created`
+
+## 2. Login user
+
+**POST** `/auth/login`
+
+Request body:
+
+```json
+{
+  "email": "test@example.com",
+  "password": "123456"
+}
+```
+
+Success response:
+- `200 OK`
+- returns JWT token
+
+## 3. Create project
 
 **POST** `/projects`
+
+Authorization:
+- `Bearer token`
 
 Request body:
 
@@ -20,15 +57,14 @@ Request body:
   "description": "A small indie game",
   "goal": 1000,
   "deadline": "2026-12-01T00:00:00",
-  "status": "active",
-  "creator_id": 1
+  "status": "active"
 }
 ```
 
 Success response:
 - `201 Created`
 
-## 2. Get all projects
+## 4. Get all projects
 
 **GET** `/projects`
 
@@ -40,7 +76,7 @@ Optional query params:
 Success response:
 - `200 OK`
 
-## 3. Get project by id
+## 5. Get project by id
 
 **GET** `/projects/:id`
 
@@ -50,9 +86,27 @@ Success response:
 Not found:
 - `404 Not Found`
 
-## 4. Add reward tier
+## 6. Get project progress
+
+**GET** `/projects/:id/progress`
+
+Success response:
+- `200 OK`
+
+Returns:
+- project id
+- goal
+- pledged amount
+- remaining amount
+- project status
+- whether the project is finalized
+
+## 7. Add reward tier
 
 **POST** `/projects/:id/tiers`
+
+Authorization:
+- `Bearer token`
 
 Request body:
 
@@ -67,15 +121,17 @@ Request body:
 Success response:
 - `201 Created`
 
-## 5. Create pledge
+## 8. Create pledge
 
 **POST** `/projects/:id/pledges`
+
+Authorization:
+- `Bearer token`
 
 With tier:
 
 ```json
 {
-  "backer_id": 2,
   "tier_id": 1,
   "amount": 10
 }
@@ -85,7 +141,6 @@ Without tier:
 
 ```json
 {
-  "backer_id": 2,
   "amount": 5
 }
 ```
@@ -100,9 +155,12 @@ Rules:
 Success response:
 - `201 Created`
 
-## 6. Finalize project
+## 9. Finalize project
 
 **POST** `/projects/:id/finalize`
+
+Authorization:
+- `Bearer token`
 
 Request body:
 - none

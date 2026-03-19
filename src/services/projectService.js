@@ -1,141 +1,145 @@
-const pool = require("../db/pool");
+const prisma = require("../db/prisma");
 const AppError = require("../utils/AppError");
+const { toNumber, serializeProject, serializeRewardTier } = require("../utils/serialize");
 
-async function createProject(projectData) {
-  const { title, description, goal, deadline, status = "draft", creator_id } = projectData;
+async function createProject(projectData, creatorId) {
+  const { title, description, goal, deadline, status = "draft" } = projectData;
 
-  const userCheckQuery = "SELECT id FROM users WHERE id = $1";
-  const userCheckResult = await pool.query(userCheckQuery, [creator_id]);
+  const user = await prisma.user.findUnique({
+    where: { id: creatorId },
+  });
 
-  if (userCheckResult.rowCount === 0) {
+  if (!user) {
     throw new AppError("Creator user not found.", 404);
   }
 
-const query = `
-INSERT INTO projects (title, description, goal, deadline, status, creator_id)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, title, description, goal, deadline, status, creator_id
-`;
-
-const values = [
-  title,
-  description,
-  goal,
-  deadline,
-  status,
-  creator_id
-];
-
-  const result = await pool.query(query, values);
-
-  return result.rows[0];
-}
-
-async function getAllProjects(filters = {}) {
-  const conditions = [];
-  const values = [];
-
-  if (filters.finalized === "true") {
-    conditions.push(`p.status IN ('successful', 'failed')`);
-  }
-
-  if (filters.status) {
-    values.push(filters.status);
-    conditions.push(`p.status = $${values.length}`);
-  }
-
-  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  const query = `
-    SELECT
-      p.id,
-      p.title,
-      p.description,
-      p.goal,
-      p.deadline,
-      p.status,
-      p.creator_id,
-      p.created_at,
-      COALESCE(COUNT(rt.id), 0)::INTEGER AS reward_tiers_count
-    FROM projects p
-    LEFT JOIN reward_tiers rt ON rt.project_id = p.id
-    ${whereClause}
-    GROUP BY p.id
-    ORDER BY p.created_at DESC
-  `;
-
-  const result = await pool.query(query, values);
-  return result.rows;
-}
-
-async function getProjectById(projectId) {
-  const projectQuery = `
-    SELECT
-      id,
+  const project = await prisma.project.create({
+    data: {
       title,
       description,
       goal,
-      deadline,
+      deadline: new Date(deadline),
       status,
-      creator_id,
-      created_at
-    FROM projects
-    WHERE id = $1
-  `;
+      creatorId,
+    },
+  });
 
-  const projectResult = await pool.query(projectQuery, [projectId]);
+  return serializeProject(project);
+}
 
-  if (projectResult.rowCount === 0) {
+async function getAllProjects(filters = {}) {
+  const where = {};
+
+  if (filters.finalized === "true") {
+    where.status = {
+      in: ["successful", "failed"],
+    };
+  }
+
+  if (filters.status) {
+    where.status = filters.status;
+  }
+
+  const projects = await prisma.project.findMany({
+    where,
+    include: {
+      _count: {
+        select: {
+          rewardTiers: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return projects.map((project) => ({
+    ...serializeProject(project),
+    reward_tiers_count: project._count.rewardTiers,
+  }));
+}
+
+async function getProjectById(projectId) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      rewardTiers: {
+        orderBy: [{ amount: "asc" }, { id: "asc" }],
+      },
+    },
+  });
+
+  if (!project) {
     throw new AppError("Project not found.", 404);
   }
 
-  const rewardTiersQuery = `
-    SELECT
-      id,
-      project_id,
-      title,
-      amount,
-      quantity_total,
-      quantity_remaining
-    FROM reward_tiers
-    WHERE project_id = $1
-    ORDER BY amount ASC, id ASC
-  `;
-
-  const rewardTiersResult = await pool.query(rewardTiersQuery, [projectId]);
-
   return {
-    ...projectResult.rows[0],
-    reward_tiers: rewardTiersResult.rows,
+    ...serializeProject(project),
+    reward_tiers: project.rewardTiers.map(serializeRewardTier),
   };
 }
 
-async function addRewardTier(projectId, rewardTierData) {
+async function addRewardTier(projectId, rewardTierData, userId) {
   const { title, amount, quantity_total } = rewardTierData;
 
-  const projectCheckQuery = "SELECT id FROM projects WHERE id = $1";
-  const projectCheckResult = await pool.query(projectCheckQuery, [projectId]);
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
 
-  if (projectCheckResult.rowCount === 0) {
+  if (!project) {
     throw new AppError("Project not found.", 404);
   }
 
-  const query = `
-    INSERT INTO reward_tiers (
-      project_id,
+  if (project.creatorId !== userId) {
+    throw new AppError("Only the project creator can add reward tiers.", 403);
+  }
+
+  const rewardTier = await prisma.rewardTier.create({
+    data: {
+      projectId,
       title,
       amount,
-      quantity_total,
-      quantity_remaining
-    )
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id, project_id, title, amount, quantity_total, quantity_remaining
-  `;
+      quantityTotal: quantity_total,
+      quantityRemaining: quantity_total,
+    },
+  });
 
-  const values = [projectId, title, amount, quantity_total, quantity_total];
-  const result = await pool.query(query, values);
+  return serializeRewardTier(rewardTier);
+}
 
-  return result.rows[0];
+async function getProjectProgress(projectId) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    throw new AppError("Project not found.", 404);
+  }
+
+  const total = await prisma.pledge.aggregate({
+    where: {
+      projectId,
+      status: {
+        not: "refunded",
+      },
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  const pledgedAmount = toNumber(total._sum.amount || 0);
+  const goal = toNumber(project.goal);
+
+  return {
+    project_id: project.id,
+    goal,
+    pledged_amount: pledgedAmount,
+    remaining_amount: Math.max(goal - pledgedAmount, 0),
+    status: project.status,
+    is_finalized: ["successful", "failed"].includes(project.status),
+  };
 }
 
 module.exports = {
@@ -143,4 +147,5 @@ module.exports = {
   getAllProjects,
   getProjectById,
   addRewardTier,
+  getProjectProgress,
 };

@@ -1,12 +1,14 @@
 # backend-midterm
 
-Crowdfunding backend midterm project built with Node.js, Express, and PostgreSQL on Neon.
+Crowdfunding backend midterm project built with Node.js, Express, Prisma 5, and PostgreSQL on Neon.
 
 This project is a small Kickstarter-like API where:
 - creators can create projects
 - projects can have reward tiers with limited quantities
+- users can register and login with JWT authentication
 - backers can create pledges
 - projects can be finalized as successful or failed
+- anyone can see current fundraising progress before final status
 
 ## What is implemented
 
@@ -24,6 +26,11 @@ This project is a small Kickstarter-like API where:
 - `refunds` table
 - `POST /projects/:id/pledges`
 - `POST /projects/:id/finalize`
+
+### Authentication and progress
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /projects/:id/progress`
 
 ## Project structure
 
@@ -69,14 +76,21 @@ npm install
 ```env
 PORT=5000
 DATABASE_URL=your_neon_connection_string
-DB_SSL=true
+JWT_SECRET=your_secret_key
+JWT_EXPIRES_IN=7d
 ```
 
-3. Apply database schema and migrations in Neon SQL Editor:
+3. Install Prisma client:
+
+```bash
+npx prisma generate
+```
+
+4. Apply database schema and migrations in Neon SQL Editor:
 - first run `src/db/schema.sql` if the database is empty
 - then run `src/db/migrations/002_create_pledges_refunds.sql` for Part 2
 
-4. Start the server:
+5. Start the server:
 
 ```bash
 npm run dev
@@ -91,9 +105,10 @@ http://localhost:5000
 ## Main endpoints
 
 ### Projects
-- `POST /projects`
+- `POST /projects`  `Authorization: Bearer <token>`
 - `GET /projects`
 - `GET /projects/:id`
+- `GET /projects/:id/progress`
 
 Example body:
 
@@ -103,13 +118,12 @@ Example body:
   "description": "A small indie game",
   "goal": 1000,
   "deadline": "2026-12-01T00:00:00",
-  "status": "active",
-  "creator_id": 1
+  "status": "active"
 }
 ```
 
 ### Reward tiers
-- `POST /projects/:id/tiers`
+- `POST /projects/:id/tiers`  `Authorization: Bearer <token>`
 
 Example body:
 
@@ -122,13 +136,12 @@ Example body:
 ```
 
 ### Pledges
-- `POST /projects/:id/pledges`
+- `POST /projects/:id/pledges`  `Authorization: Bearer <token>`
 
 Example with tier:
 
 ```json
 {
-  "backer_id": 2,
   "tier_id": 1,
   "amount": 10
 }
@@ -138,15 +151,37 @@ Example without tier:
 
 ```json
 {
-  "backer_id": 2,
   "amount": 5
 }
 ```
 
 ### Finalize
-- `POST /projects/:id/finalize`
+- `POST /projects/:id/finalize`  `Authorization: Bearer <token>`
 
 This endpoint does not need a request body.
+
+### Auth
+- `POST /auth/register`
+- `POST /auth/login`
+
+Register example:
+
+```json
+{
+  "full_name": "Test User",
+  "email": "test@example.com",
+  "password": "123456"
+}
+```
+
+Login example:
+
+```json
+{
+  "email": "test@example.com",
+  "password": "123456"
+}
+```
 
 ## Business rules
 
@@ -156,6 +191,8 @@ This endpoint does not need a request body.
 - Tier quantity is decremented atomically inside a transaction.
 - When a failed project is finalized, refund records are created and tier inventory is restored.
 - A project cannot be finalized twice.
+- Protected actions use JWT authentication.
+- Project progress can be checked through `GET /projects/:id/progress`.
 
 ## Testing
 
@@ -172,5 +209,5 @@ Recommended order for checking the full flow:
 ## Notes
 
 - `users` is used as a supporting table for creators and backers.
-- Database connection uses `pg` and Neon-compatible SSL config.
+- Database access is handled through Prisma 5.
 - Error handling is centralized through `AppError` and the error middleware.

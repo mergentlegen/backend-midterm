@@ -11,6 +11,10 @@
       "value": "http://localhost:5000"
     },
     {
+      "key": "token",
+      "value": ""
+    },
+    {
       "key": "projectId",
       "value": "1"
     },
@@ -28,7 +32,7 @@
       "name": "Projects",
       "item": [
         {
-          "name": "Create Project",
+          "name": "Register User",
           "request": {
             "method": "POST",
             "header": [
@@ -39,7 +43,65 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Smart Bottle\",\n  \"description\": \"A smart bottle for tracking daily water intake.\",\n  \"goal\": 5000,\n  \"deadline\": \"2026-12-31T23:59:59.000Z\",\n  \"status\": \"active\",\n  \"creator_id\": 3\n}"
+              "raw": "{\n  \"full_name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Smart Bottle\",\n  \"description\": \"A smart bottle for tracking daily water intake.\",\n  \"goal\": 5000,\n  \"deadline\": \"2026-12-31T23:59:59.000Z\",\n  \"status\": \"active\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/projects",
@@ -89,10 +151,33 @@
           "response": []
         },
         {
+          "name": "Get Project Progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "progress"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Add Reward Tier",
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -127,13 +212,17 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"backer_id\": {{backerId}},\n  \"tier_id\": {{tierId}},\n  \"amount\": 25\n}"
+              "raw": "{\n  \"tier_id\": {{tierId}},\n  \"amount\": 25\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/projects/{{projectId}}/pledges",
@@ -155,13 +244,17 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"backer_id\": {{backerId}},\n  \"amount\": 10\n}"
+              "raw": "{\n  \"amount\": 10\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/projects/{{projectId}}/pledges",
@@ -186,7 +279,12 @@
           "name": "Finalize Project",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/projects/{{projectId}}/finalize",
               "host": [

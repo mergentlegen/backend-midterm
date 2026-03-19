@@ -1,6 +1,5 @@
 const AppError = require("../utils/AppError");
 
-const allowedStatuses = ["draft", "active", "closed", "cancelled", "successful", "failed"];
 const allowedProjectCreationStatuses = ["draft", "active", "closed", "cancelled"];
 
 function validateNumericIdParam(paramName) {
@@ -16,7 +15,7 @@ function validateNumericIdParam(paramName) {
 }
 
 function validateProjectPayload(req, res, next) {
-  const { title, description, goal, deadline, status, creator_id } = req.body;
+  const { title, description, goal, deadline, status } = req.body;
 
   if (!title || typeof title !== "string" || !title.trim()) {
     return next(new AppError("Title is required.", 400));
@@ -42,10 +41,6 @@ function validateProjectPayload(req, res, next) {
     return next(new AppError("Status is invalid.", 400));
   }
 
-  if (!Number.isInteger(creator_id) || creator_id <= 0) {
-    return next(new AppError("creator_id must be a positive integer.", 400));
-  }
-
   next();
 }
 
@@ -68,11 +63,7 @@ function validateRewardTierPayload(req, res, next) {
 }
 
 function validatePledgePayload(req, res, next) {
-  const { backer_id, tier_id, amount } = req.body;
-
-  if (!Number.isInteger(backer_id) || backer_id <= 0) {
-    return next(new AppError("backer_id must be a positive integer.", 400));
-  }
+  const { tier_id, amount } = req.body;
 
   if (tier_id !== undefined && tier_id !== null && (!Number.isInteger(tier_id) || tier_id <= 0)) {
     return next(new AppError("tier_id must be a positive integer when provided.", 400));
@@ -85,9 +76,43 @@ function validatePledgePayload(req, res, next) {
   next();
 }
 
+function validateRegisterPayload(req, res, next) {
+  const { full_name, email, password } = req.body;
+
+  if (!full_name || typeof full_name !== "string" || !full_name.trim()) {
+    return next(new AppError("full_name is required.", 400));
+  }
+
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return next(new AppError("Email is required.", 400));
+  }
+
+  if (!password || typeof password !== "string" || password.length < 6) {
+    return next(new AppError("Password must be at least 6 characters long.", 400));
+  }
+
+  next();
+}
+
+function validateLoginPayload(req, res, next) {
+  const { email, password } = req.body;
+
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return next(new AppError("Email is required.", 400));
+  }
+
+  if (!password || typeof password !== "string") {
+    return next(new AppError("Password is required.", 400));
+  }
+
+  next();
+}
+
 module.exports = {
   validateProjectPayload,
   validateRewardTierPayload,
   validatePledgePayload,
+  validateRegisterPayload,
+  validateLoginPayload,
   validateNumericIdParam,
 };
